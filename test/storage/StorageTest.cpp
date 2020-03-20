@@ -94,6 +94,23 @@ TEST(StorageTest, PutDeleteGet) {
     EXPECT_TRUE(value == "val2");
 }
 
+TEST(StorageTest, DeleteMiddle)
+{
+    SimpleLRU storage;
+
+    EXPECT_TRUE(storage.Put("KEY1", "val1"));
+    EXPECT_TRUE(storage.Put("KEY2", "val2"));
+    EXPECT_TRUE(storage.Put("KEY3", "val3"));
+
+    EXPECT_TRUE(storage.Delete("KEY2"));
+
+    std::string value;
+    EXPECT_FALSE(storage.Get("KEY2", value));
+    EXPECT_TRUE(storage.Get("KEY1", value));
+    EXPECT_TRUE(value == "val1");
+    EXPECT_TRUE(storage.Get("KEY3", value));
+    EXPECT_TRUE(value == "val3");
+}
 
 TEST(StorageTest, GetIfAbsent)
 {
