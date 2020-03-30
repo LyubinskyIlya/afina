@@ -60,6 +60,7 @@ private:
         lru_node(const std::string &k, const std::string &v):key(k), value(v), prev(nullptr), next(nullptr){}
     };
 
+    void MoveToHead(lru_node &node);
     bool Set(const std::string &key, const std::string &value, lru_node &node);
 	bool PutNew(const std::string &key, const std::string &value);
 	void DeleteHead();

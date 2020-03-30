@@ -4,31 +4,30 @@ namespace Afina {
 namespace Backend {
 
 
-
-
-bool SimpleLRU::Set(const std::string &key, const std::string &value, lru_node &node) { 
-	while (key.size() + value.size() + _curr_size > _max_size) {
-		DeleteTail();
+void SimpleLRU::MoveToHead(lru_node &node) {
+	if (&node == _lru_head.get()) {
+		return;
 	}
-	size_t old_size = node.value.size();
-	node.value = value;
 	if (node.next != nullptr) {
 		node.next->prev = node.prev;
 	}
-	if (&node != _lru_head.get()) {
-		auto tmp_node = std::move(node.prev->next);
-		node.prev->next = std::move(node.next);
-		if (tmp_node.get() != _lru_head->prev) {
-			tmp_node->prev = _lru_head->prev;
-		}
-		tmp_node->next = std::move(_lru_head);
-		tmp_node->next->prev = tmp_node.get();
-		_lru_head = std::move(tmp_node);
+	auto tmp_node = std::move(node.prev->next);
+	node.prev->next = std::move(node.next);
+	if (tmp_node.get() != _lru_head->prev) {
+		tmp_node->prev = _lru_head->prev;
 	}
-	else {
-		_lru_head->value = value;
+	tmp_node->next = std::move(_lru_head);
+	tmp_node->next->prev = tmp_node.get();
+	_lru_head = std::move(tmp_node);
+}
 
+bool SimpleLRU::Set(const std::string &key, const std::string &value, lru_node &node) { 
+	size_t old_size = node.value.size();
+	MoveToHead(node);
+	while (_curr_size - old_size + value.size() > _max_size) {
+		DeleteTail();
 	}
+	_lru_head->value = value;
 	_curr_size += value.size() - old_size;
 	return true;
 }
@@ -110,6 +109,7 @@ bool SimpleLRU::Get(const std::string &key, std::string &value) {
 	else {
 		lru_node &node = elem->second;
 		value = node.value;
+		MoveToHead(elem->second);
 		return true;
 	}
 }
