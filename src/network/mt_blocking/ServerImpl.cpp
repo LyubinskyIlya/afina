@@ -20,6 +20,7 @@
 #include <afina/Storage.h>
 #include <afina/execute/Command.h>
 #include <afina/logging/Service.h>
+#include <afina/concurrency/Executor.h>
 
 #include "protocol/Parser.h"
 
@@ -198,6 +199,7 @@ void ServerImpl::Worker(int client_socket) {
 
 // See Server.h
 void ServerImpl::OnRun() {
+    Afina::Concurrency::Executor executor("name", 0, 2, 4, 2, 5000); // low=2, hight=4, q_size=2, idle_time=5sec 
     while (running.load()) {
         _logger->debug("waiting for connection...");
 
@@ -230,33 +232,18 @@ void ServerImpl::OnRun() {
             setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
         }
 
-        // TODO: Start new thread and process data from/to connection
+        // New thread in pool
         {
-            std::unique_lock<std::mutex> _lock (simpi_mutex);
-            if (curr_workers < n_workers)
-            {
-                curr_workers++;
-                std::thread th(&ServerImpl::Worker, this, client_socket);
-                th.detach();
-            }
-            else 
-            {
+            if (not executor.Execute(&ServerImpl::Worker, this, client_socket)) {
                 static const std::string msg = "No free workers. Try later.\n";
                 if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
                     _logger->error("Failed to write response to client: {}", strerror(errno));
                 }
                 close(client_socket);
-            }
+            } 
         }
     }
-    // Cleanup on exit...
-    {
-        std::unique_lock<std::mutex> _lock(simpi_mutex);
-        while (curr_workers > 0)
-        {
-            no_workers.wait(_lock);
-        }
-    }
+    executor.Stop(true);
     _logger->warn("Network stopped");
 }
 
